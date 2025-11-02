@@ -1,47 +1,43 @@
 "use client"
 
-import { useState, useEffect, type RefObject } from "react"
+import { useEffect, useState } from "react"
 
 interface Dimensions {
   width: number
   height: number
 }
 
-export function useDimensions(ref: RefObject<HTMLElement | SVGElement>): Dimensions {
+export function useDimensions(ref: React.RefObject<HTMLElement>, debounceMs = 100): Dimensions {
   const [dimensions, setDimensions] = useState<Dimensions>({ width: 0, height: 0 })
 
   useEffect(() => {
+    if (!ref.current) return
+
+    const element = ref.current
     let timeoutId: NodeJS.Timeout
 
     const updateDimensions = () => {
-      if (ref.current) {
-        const rect = ref.current.getBoundingClientRect()
-        if (rect) {
-          const { width, height } = rect
-          setDimensions({ width, height })
-        }
-      }
-    }
-
-    const debouncedUpdateDimensions = () => {
       clearTimeout(timeoutId)
-      timeoutId = setTimeout(updateDimensions, 250) // Wait 250ms after resize ends
+      timeoutId = setTimeout(() => {
+        setDimensions({
+          width: element.offsetWidth,
+          height: element.offsetHeight,
+        })
+      }, debounceMs)
     }
 
-    if (typeof window !== "undefined") {
-      // Initial measurement
-      updateDimensions()
+    // Initial measurement
+    updateDimensions()
 
-      window.addEventListener("resize", debouncedUpdateDimensions)
-    }
+    // Observe size changes
+    const resizeObserver = new ResizeObserver(updateDimensions)
+    resizeObserver.observe(element)
 
     return () => {
-      if (typeof window !== "undefined") {
-        window.removeEventListener("resize", debouncedUpdateDimensions)
-      }
       clearTimeout(timeoutId)
+      resizeObserver.disconnect()
     }
-  }, [ref])
+  }, [ref, debounceMs])
 
   return dimensions
 }
